@@ -1,0 +1,92 @@
+# .github/workflows/packer-build.yml
+
+name: 'Premier Managed OS Packer Build'
+
+# This is the crucial part that listens for the 'build-image' event
+# sent from the web application.
+on:
+  repository_dispatch:
+    types: [build-image]
+
+jobs:
+  # This job will only run if the platform selected in the UI was 'AWS'.
+  build-aws:
+    if: github.event.client_payload.platform == 'aws'
+    name: 'Build AWS AMI'
+    runs-on: ubuntu-latest
+    steps:
+      - name: 'Checkout Packer Templates'
+        uses: actions/checkout@v4
+
+      - name: 'Set up Packer'
+        uses: hashicorp/setup-packer@main
+        with:
+          version: 'latest'
+
+      - name: 'Run AWS Packer Build'
+        env:
+          # These secrets MUST be configured in your GitHub repository settings
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          # Example of passing a variable from the UI into your Packer template
+          PKR_VAR_aws_region: "us-east-1"
+        run: |
+          # The 'packer build .' command assumes your .pkr.hcl files are in the root.
+          # If they are in a sub-directory (e.g., 'aws/'), change this to:
+          # packer init aws/
+          # packer build aws/
+          packer init .
+          packer build .
+
+  # This job will only run if the platform selected was 'Azure'.
+  build-azure:
+    if: github.event.client_payload.platform == 'azure'
+    name: 'Build Azure Image'
+    runs-on: ubuntu-latest
+    steps:
+      - name: 'Checkout Packer Templates'
+        uses: actions/checkout@v4
+
+      - name: 'Set up Packer'
+        uses: hashicorp/setup-packer@main
+        with:
+          version: 'latest'
+
+      - name: 'Run Azure Packer Build'
+        env:
+          # These secrets MUST be configured in your GitHub repository settings
+          ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          ARM_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+          ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+        run: |
+          packer init .
+          packer build .
+  
+  # This job will only run if the platform selected was 'GCP'.
+  build-gcp:
+    if: github.event.client_payload.platform == 'gcp'
+    name: 'Build GCP Image'
+    runs-on: ubuntu-latest
+    steps:
+      - name: 'Checkout Packer Templates'
+        uses: actions/checkout@v4
+
+      - name: 'Set up Packer'
+        uses: hashicorp/setup-packer@main
+        with:
+          version: 'latest'
+
+      - name: 'Authenticate to Google Cloud'
+        uses: 'google-github-actions/auth@v2'
+        with:
+          # This secret contains the JSON key for your GCP Service Account
+          credentials_json: '${{ secrets.GCP_SA_KEY }}'
+
+      - name: 'Run GCP Packer Build'
+        env:
+          # Your GCP Project ID, also stored as a secret
+          PKR_VAR_project_id: ${{ secrets.GCP_PROJECT_ID }}
+        run: |
+          packer init .
+          packer build .
