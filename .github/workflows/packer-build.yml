@@ -15,11 +15,14 @@ jobs:
       - name: Setup Packer
         uses: hashicorp/setup-packer@main
 
-      # OPTIONAL: Authenticate to Google Cloud. This is the recommended secure way.
-      # - name: Authenticate to Google Cloud
-      #   uses: 'google-github-actions/auth@v2'
-      #   with:
-      #     credentials_json: '${{ secrets.GCP_CREDENTIALS }}' # A secret containing the JSON key for a service account
+      # REQUIRED for GCP Builds: Authenticate to Google Cloud.
+      # This step uses your GCP_CREDENTIALS secret to create a credentials file
+      # that Packer can automatically find and use.
+      - name: Authenticate to Google Cloud
+        if: github.event.client_payload.platform == 'gcp'
+        uses: 'google-github-actions/auth@v2'
+        with:
+          credentials_json: '${{ secrets.GCP_CREDENTIALS }}'
 
       - name: 'Debug: Show Webhook Payload'
         run: |
@@ -27,25 +30,27 @@ jobs:
           echo "Platform: ${{ github.event.client_payload.platform }}"
 
       - name: 'Build Packer Image'
-        # IMPORTANT: This 'env' block maps your GitHub secrets to environment variables
-        # that Packer can read. Packer looks for variables prefixed with 'PKR_VAR_'.
+        # This 'env' block maps your GitHub secrets to environment variables
+        # that Packer and other tools can read.
         env:
-          # This line takes your GitHub secret named GCP_PROJECT_ID and creates an
-          # environment variable named PKR_VAR_gcp_project_id. Packer then uses this
-          # to populate the 'gcp_project_id' variable in your .pkr.hcl template.
+          # --- GCP ---
+          # Authentication is handled by the 'Authenticate to Google Cloud' step above.
+          # You just need to pass the project ID as a Packer variable.
           PKR_VAR_gcp_project_id: ${{ secrets.GCP_PROJECT_ID }}
 
-          # === Examples for other providers ===
           # --- AWS ---
-          # AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          # AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          # The AWS CLI and Packer will automatically use these standard environment variables for authentication.
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          # You can also pass variables to your template like this:
           # PKR_VAR_aws_region: "us-east-1"
           
           # --- Azure ---
-          # PKR_VAR_client_id: ${{ secrets.AZURE_CLIENT_ID }}
-          # PKR_VAR_client_secret: ${{ secrets.AZURE_CLIENT_SECRET }}
-          # PKR_VAR_subscription_id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-          # PKR_VAR_tenant_id: ${{ secrets.AZURE_TENANT_ID }}
+          # Pass Service Principal credentials as Packer variables.
+          PKR_VAR_client_id: ${{ secrets.AZURE_CLIENT_ID }}
+          PKR_VAR_client_secret: ${{ secrets.AZURE_CLIENT_SECRET }}
+          PKR_VAR_subscription_id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          PKR_VAR_tenant_id: ${{ secrets.AZURE_TENANT_ID }}
         run: |
           # Dynamically construct the template filename from the payload
           TEMPLATE_FILE="${{ github.event.client_payload.image_id }}-${{ github.event.client_payload.platform }}.pkr.hcl"
