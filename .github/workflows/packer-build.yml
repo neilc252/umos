@@ -48,7 +48,7 @@ jobs:
           # PKR_VAR_tenant_id: ${{ secrets.AZURE_TENANT_ID }}
         run: |
           # Dynamically construct the template filename from the payload
-          TEMPLATE_FILE="${{ github.event.client_payload.image_id }}-${{ github.event.client_payload.platform }}.pkr.hcl"
+          TEMPLATE_FILE="/${{ github.event.client_payload.image_id }}-${{ github.event.client_payload.platform }}.pkr.hcl"
 
           echo "Using template file: $TEMPLATE_FILE"
           
