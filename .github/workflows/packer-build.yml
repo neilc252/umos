@@ -15,27 +15,48 @@ jobs:
       - name: Setup Packer
         uses: hashicorp/setup-packer@main
 
+      # OPTIONAL: Authenticate to Google Cloud. This is the recommended secure way.
+      # - name: Authenticate to Google Cloud
+      #   uses: 'google-github-actions/auth@v2'
+      #   with:
+      #     credentials_json: '${{ secrets.GCP_CREDENTIALS }}' # A secret containing the JSON key for a service account
+
       - name: 'Debug: Show Webhook Payload'
         run: |
           echo "Building image for OS: ${{ github.event.client_payload.image_id }}"
           echo "Platform: ${{ github.event.client_payload.platform }}"
 
       - name: 'Build Packer Image'
+        # IMPORTANT: This 'env' block maps your GitHub secrets to environment variables
+        # that Packer can read. Packer looks for variables prefixed with 'PKR_VAR_'.
+        env:
+          # This line takes your GitHub secret named GCP_PROJECT_ID and creates an
+          # environment variable named PKR_VAR_gcp_project_id. Packer then uses this
+          # to populate the 'gcp_project_id' variable in your .pkr.hcl template.
+          PKR_VAR_gcp_project_id: ${{ secrets.GCP_PROJECT_ID }}
+
+          # === Examples for other providers ===
+          # --- AWS ---
+          # AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          # AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          # PKR_VAR_aws_region: "us-east-1"
+          
+          # --- Azure ---
+          # PKR_VAR_client_id: ${{ secrets.AZURE_CLIENT_ID }}
+          # PKR_VAR_client_secret: ${{ secrets.AZURE_CLIENT_SECRET }}
+          # PKR_VAR_subscription_id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          # PKR_VAR_tenant_id: ${{ secrets.AZURE_TENANT_ID }}
         run: |
           # Dynamically construct the template filename from the payload
           TEMPLATE_FILE="${{ github.event.client_payload.image_id }}-${{ github.event.client_payload.platform }}.pkr.hcl"
 
           echo "Using template file: $TEMPLATE_FILE"
           
-          # Check if the required file exists before trying to build
           if [ ! -f "$TEMPLATE_FILE" ]; then
             echo "Error: Template file $TEMPLATE_FILE not found in repository."
             exit 1
           fi
 
-          # Authenticate with your cloud provider here
-          # (e.g., using google-github-actions/auth for GCP)
-
-          # Run packer init and build using the specific template file
+          # Packer automatically finds variables set in the 'env' block above
           packer init $TEMPLATE_FILE
           packer build $TEMPLATE_FILE
