@@ -48,12 +48,13 @@ jobs:
           # PKR_VAR_tenant_id: ${{ secrets.AZURE_TENANT_ID }}
         run: |
           # Dynamically construct the template filename from the payload
-          TEMPLATE_FILE="/${{ github.event.client_payload.image_id }}-${{ github.event.client_payload.platform }}.pkr.hcl"
+          TEMPLATE_FILE="${{ github.event.client_payload.image_id }}-${{ github.event.client_payload.platform }}.pkr.hcl"
 
           echo "Using template file: $TEMPLATE_FILE"
           
+          # Check if the file exists in the root of the repository
           if [ ! -f "$TEMPLATE_FILE" ]; then
-            echo "Error: Template file $TEMPLATE_FILE not found in repository."
+            echo "Error: Template file $TEMPLATE_FILE not found in the repository's root directory."
             exit 1
           fi
 
