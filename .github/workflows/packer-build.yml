@@ -28,22 +28,19 @@ jobs:
         run: |
           echo "Building image for OS: ${{ github.event.client_payload.image_id }}"
           echo "Platform: ${{ github.event.client_payload.platform }}"
+          echo "Run ID: ${{ github.run_id }}"
 
       - name: 'Build Packer Image'
-        # This 'env' block maps your GitHub secrets to environment variables
-        # that Packer and other tools can read.
         env:
           # --- GCP ---
+          # The project ID is passed as a Packer variable.
           # Authentication is handled by the 'Authenticate to Google Cloud' step above.
-          # You just need to pass the project ID as a Packer variable.
           PKR_VAR_gcp_project_id: ${{ secrets.GCP_PROJECT_ID }}
 
           # --- AWS ---
           # The AWS CLI and Packer will automatically use these standard environment variables for authentication.
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          # You can also pass variables to your template like this:
-          # PKR_VAR_aws_region: "us-east-1"
           
           # --- Azure ---
           # Pass Service Principal credentials as Packer variables.
@@ -52,8 +49,18 @@ jobs:
           PKR_VAR_subscription_id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
           PKR_VAR_tenant_id: ${{ secrets.AZURE_TENANT_ID }}
         run: |
-          # Dynamically construct the template filename from the payload
-          TEMPLATE_FILE="${{ github.event.client_payload.image_id }}-${{ github.event.client_payload.platform }}.pkr.hcl"
+          # Export context variables to shell environment variables for safety and clarity
+          export BUILD_ID="${{ github.run_id }}"
+          export PLATFORM="${{ github.event.client_payload.platform }}"
+          export IMAGE_ID="${{ github.event.client_payload.image_id }}"
+          
+          # Log them for debugging purposes
+          echo "BUILD_ID is: $BUILD_ID"
+          echo "PLATFORM is: $PLATFORM"
+          echo "IMAGE_ID is: $IMAGE_ID"
+
+          # Dynamically construct the template filename using the shell variables
+          TEMPLATE_FILE="${IMAGE_ID}-${PLATFORM}.pkr.hcl"
 
           echo "Using template file: $TEMPLATE_FILE"
           
@@ -63,6 +70,7 @@ jobs:
             exit 1
           fi
 
-          # Packer automatically finds variables set in the 'env' block above
-          packer init $TEMPLATE_FILE
-          packer build $TEMPLATE_FILE
+          packer init "$TEMPLATE_FILE"
+          
+          # Use the shell variables to pass arguments to Packer
+          packer build -var "build_id=$BUILD_ID" -var "platform=$PLATFORM" "$TEMPLATE_FILE"
