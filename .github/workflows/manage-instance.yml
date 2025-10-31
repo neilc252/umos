@@ -1,0 +1,74 @@
+name: Manage Instance State
+
+on:
+  repository_dispatch:
+    types: [manage-instance]
+
+jobs:
+  manage:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 'Debug: Show Webhook Payload'
+        run: |
+          echo "Action: ${{ github.event.client_payload.action }}"
+          echo "Instance: ${{ github.event.client_payload.instance_name }}"
+          echo "Platform: ${{ github.event.client_payload.platform }}"
+          echo "Region/Zone: ${{ github.event.client_payload.region }}"
+
+      # --- GCP ---
+      - name: Authenticate to Google Cloud
+        if: github.event.client_payload.platform == 'gcp'
+        uses: 'google-github-actions/auth@v2'
+        with:
+          credentials_json: '${{ secrets.GCP_CREDENTIALS }}'
+      
+      - name: Manage GCP Instance
+        if: github.event.client_payload.platform == 'gcp'
+        run: |
+          gcloud compute instances ${{ github.event.client_payload.action }} ${{ github.event.client_payload.instance_name }} \
+            --project=${{ github.event.client_payload.project_id }} \
+            --zone=${{ github.event.client_payload.region }}-a \
+            --quiet
+
+      # --- AWS ---
+      - name: Configure AWS Credentials
+        if: github.event.client_payload.platform == 'aws'
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: '${{ secrets.AWS_ACCESS_KEY_ID }}'
+          aws-secret-access-key: '${{ secrets.AWS_SECRET_ACCESS_KEY }}'
+          aws-region: '${{ github.event.client_payload.region }}'
+
+      - name: Manage AWS EC2 Instance
+        if: github.event.client_payload.platform == 'aws'
+        run: |
+          INSTANCE_ID=$(aws ec2 describe-instances --filters "Name=tag:Name,Values=${{ github.event.client_payload.instance_name }}" "Name=instance-state-name,Values=running,stopped" --query 'Reservations[0].Instances[0].InstanceId' --output text)
+          if [ -z "$INSTANCE_ID" ] || [ "$INSTANCE_ID" == "None" ]; then
+            echo "Instance named '${{ github.event.client_payload.instance_name }}' not found."
+            exit 1
+          fi
+          ACTION="${{ github.event.client_payload.action }}"
+          if [ "$ACTION" == "delete" ]; then
+            aws ec2 terminate-instances --instance-ids $INSTANCE_ID
+          else
+            aws ec2 ${ACTION}-instances --instance-ids $INSTANCE_ID
+          fi
+
+      # --- Azure ---
+      - name: Azure Login
+        if: github.event.client_payload.platform == 'azure'
+        uses: azure/login@v1
+        with:
+          creds: '{"clientId":"${{ secrets.AZURE_CLIENT_ID }}","clientSecret":"${{ secrets.AZURE_CLIENT_SECRET }}","subscriptionId":"${{ secrets.AZURE_SUBSCRIPTION_ID }}","tenantId":"${{ secrets.AZURE_TENANT_ID }}"}'
+
+      - name: Manage Azure VM
+        if: github.event.client_payload.platform == 'azure'
+        run: |
+          ACTION="${{ github.event.client_payload.action }}"
+          if [ "$ACTION" == "start" ]; then
+            az vm start --resource-group ${{ github.event.client_payload.resource_group }} --name ${{ github.event.client_payload.instance_name }}
+          elif [ "$ACTION" == "stop" ]; then
+            az vm deallocate --resource-group ${{ github.event.client_payload.resource_group }} --name ${{ github.event.client_payload.instance_name }}
+          elif [ "$ACTION" == "delete" ]; then
+            az vm delete --resource-group ${{ github.event.client_payload.resource_group }} --name ${{ github.event.client_payload.instance_name }} --yes
+          fi
