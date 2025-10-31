@@ -29,6 +29,7 @@ jobs:
           echo "Building image for OS: ${{ github.event.client_payload.image_id }}"
           echo "Platform: ${{ github.event.client_payload.platform }}"
           echo "Run ID: ${{ github.run_id }}"
+          echo "Template file: ${{ github.event.client_payload.template_file }}"
 
       - name: 'Build Packer Image'
         env:
@@ -53,17 +54,14 @@ jobs:
           export BUILD_ID="${{ github.run_id }}"
           export PLATFORM="${{ github.event.client_payload.platform }}"
           export IMAGE_ID="${{ github.event.client_payload.image_id }}"
+          export TEMPLATE_FILE="${{ github.event.client_payload.template_file }}"
           
           # Log them for debugging purposes
           echo "BUILD_ID is: $BUILD_ID"
           echo "PLATFORM is: $PLATFORM"
           echo "IMAGE_ID is: $IMAGE_ID"
+          echo "TEMPLATE_FILE is: $TEMPLATE_FILE"
 
-          # Dynamically construct the template filename using the shell variables
-          TEMPLATE_FILE="${IMAGE_ID}-${PLATFORM}.pkr.hcl"
-
-          echo "Using template file: $TEMPLATE_FILE"
-          
           # Check if the file exists in the root of the repository
           if [ ! -f "$TEMPLATE_FILE" ]; then
             echo "Error: Template file $TEMPLATE_FILE not found in the repository's root directory."
