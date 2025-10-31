@@ -34,12 +34,31 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ github.event.client_payload.region || 'us-east-1' }}
 
-      - name: Delete AWS AMI
+      - name: Find and Delete AWS AMI
         if: github.event.client_payload.platform == 'aws'
         run: |
-          # The image_name payload should be the AMI ID
-          aws ec2 deregister-image --image-id ${{ github.event.client_payload.image_name }}
-          # Note: This does not delete the underlying snapshot. Manual snapshot cleanup might be needed for cost savings.
+          AMI_NAME="${{ github.event.client_payload.image_name }}"
+          echo "Finding AMI with name: $AMI_NAME"
+          
+          AMI_ID=$(aws ec2 describe-images --owners self --filters "Name=name,Values=$AMI_NAME" --query 'Images[0].ImageId' --output text)
+          
+          if [ -z "$AMI_ID" ] || [ "$AMI_ID" == "None" ]; then
+            echo "AMI with name '$AMI_NAME' not found. It might have been deleted already."
+            exit 0
+          fi
+          
+          echo "Found AMI ID: $AMI_ID. Deregistering..."
+          aws ec2 deregister-image --image-id $AMI_ID
+          
+          SNAPSHOT_ID=$(aws ec2 describe-images --image-ids $AMI_ID --query 'Images[0].BlockDeviceMappings[0].Ebs.SnapshotId' --output text)
+          if [ -n "$SNAPSHOT_ID" ] && [ "$SNAPSHOT_ID" != "None" ]; then
+            echo "Deleting associated snapshot ID: $SNAPSHOT_ID"
+            aws ec2 delete-snapshot --snapshot-id $SNAPSHOT_ID
+          else
+            echo "Could not find associated snapshot."
+          fi
+          echo "AMI deregistration and snapshot deletion process initiated."
+
 
       # --- Azure Deletion ---
       - name: Azure Login
