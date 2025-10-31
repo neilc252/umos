@@ -42,16 +42,33 @@ jobs:
       - name: Manage AWS EC2 Instance
         if: github.event.client_payload.platform == 'aws'
         run: |
-          INSTANCE_ID=$(aws ec2 describe-instances --filters "Name=tag:Name,Values=${{ github.event.client_payload.instance_name }}" "Name=instance-state-name,Values=running,stopped" --query 'Reservations[0].Instances[0].InstanceId' --output text)
+          # Find the instance ID from its name tag. Include transient states in the filter.
+          INSTANCE_ID=$(aws ec2 describe-instances --filters "Name=tag:Name,Values=${{ github.event.client_payload.instance_name }}" "Name=instance-state-name,Values=pending,running,shutting-down,stopped,stopping" --query 'Reservations[0].Instances[0].InstanceId' --output text)
+          
+          # Check if the instance was found
           if [ -z "$INSTANCE_ID" ] || [ "$INSTANCE_ID" == "None" ]; then
             echo "Instance named '${{ github.event.client_payload.instance_name }}' not found."
-            exit 1
+            # If the action was 'delete', the instance might already be gone. Exit cleanly.
+            if [ "${{ github.event.client_payload.action }}" == "delete" ]; then
+              echo "Instance not found, assuming it is already deleted. Exiting successfully."
+              exit 0
+            else
+              exit 1
+            fi
           fi
+
           ACTION="${{ github.event.client_payload.action }}"
-          if [ "$ACTION" == "delete" ]; then
+          echo "Performing '$ACTION' on instance $INSTANCE_ID"
+
+          if [ "$ACTION" == "start" ]; then
+            aws ec2 start-instances --instance-ids $INSTANCE_ID
+          elif [ "$ACTION" == "stop" ]; then
+            aws ec2 stop-instances --instance-ids $INSTANCE_ID
+          elif [ "$ACTION" == "delete" ]; then
             aws ec2 terminate-instances --instance-ids $INSTANCE_ID
           else
-            aws ec2 ${ACTION}-instances --instance-ids $INSTANCE_ID
+            echo "Error: Unknown action '$ACTION'"
+            exit 1
           fi
 
       # --- Azure ---
