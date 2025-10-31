@@ -45,8 +45,10 @@ build {
 
   provisioner "shell" {
     inline = [
+      "echo 'Waiting for cloud-init to finish...'",
+      "cloud-init status --wait || echo 'cloud-init not found, continuing...'",
       "echo 'Updating packages...'",
-      "if [ -f /usr/bin/apt-get ]; then sudo apt-get update && sudo apt-get -y upgrade; fi",
+      "if [ -f /usr/bin/apt-get ]; then sudo apt-get clean; for i in {1..3}; do sudo apt-get update -y && break || sleep 15; done; sudo DEBIAN_FRONTEND=noninteractive apt-get upgrade -y; fi",
       "if [ -f /usr/bin/yum ]; then sudo yum -y update; fi",
       "if [ -f /usr/bin/dnf ]; then sudo dnf -y update; fi"
     ]
