@@ -5,6 +5,10 @@ on:
   repository_dispatch:
     types: [build-image]
 
+permissions:
+  id-token: write # Required to fetch the OIDC token for AWS authentication.
+  contents: read  # Required for actions/checkout.
+
 jobs:
   build:
     runs-on: ubuntu-latest
