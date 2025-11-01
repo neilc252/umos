@@ -24,6 +24,15 @@ jobs:
         with:
           credentials_json: '${{ secrets.GCP_CREDENTIALS }}'
 
+      - name: Configure AWS Credentials
+        if: github.event.client_payload.platform == 'aws'
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          role-to-assume: ${{ github.event.client_payload.aws_role_arn }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ github.event.client_payload.aws_region || 'us-east-1' }}
+
       - name: 'Debug: Show Webhook Payload'
         run: |
           echo "Building image for OS: ${{ github.event.client_payload.image_id }}"
@@ -38,11 +47,6 @@ jobs:
           # Authentication is handled by the 'Authenticate to Google Cloud' step above.
           PKR_VAR_gcp_project_id: ${{ secrets.GCP_PROJECT_ID }}
 
-          # --- AWS ---
-          # The AWS CLI and Packer will automatically use these standard environment variables for authentication.
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          
           # --- Azure ---
           # Pass Service Principal credentials as Packer variables.
           PKR_VAR_client_id: ${{ secrets.AZURE_CLIENT_ID }}
