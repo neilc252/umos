@@ -4,6 +4,10 @@ on:
   repository_dispatch:
     types: [manage-instance]
 
+permissions:
+  id-token: write # Required to fetch the OIDC token for AWS authentication.
+  contents: read  # Required for actions/checkout.
+
 jobs:
   manage:
     runs-on: ubuntu-latest
@@ -35,6 +39,7 @@ jobs:
         if: github.event.client_payload.platform == 'aws'
         uses: aws-actions/configure-aws-credentials@v2
         with:
+          role-to-assume: ${{ github.event.client_payload.aws_role_arn }}
           aws-access-key-id: '${{ secrets.AWS_ACCESS_KEY_ID }}'
           aws-secret-access-key: '${{ secrets.AWS_SECRET_ACCESS_KEY }}'
           aws-region: '${{ github.event.client_payload.region || 'us-east-1' }}'
