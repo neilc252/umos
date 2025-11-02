@@ -19,20 +19,23 @@ jobs:
       - name: Setup Packer
         uses: hashicorp/setup-packer@main
 
-      # REQUIRED for GCP Builds: Authenticate to Google Cloud.
-      # This step uses your GCP_CREDENTIALS secret to create a credentials file
-      # that Packer can automatically find and use.
       - name: Authenticate to Google Cloud
         if: github.event.client_payload.platform == 'gcp'
         uses: 'google-github-actions/auth@v2'
         with:
-          credentials_json: '${{ secrets.GCP_CREDENTIALS }}'
+          credentials_json: ${{ secrets.GCP_CREDENTIALS }}
 
-      - name: Configure AWS Credentials
-        if: github.event.client_payload.platform == 'aws'
+      - name: Configure AWS Credentials for IAM Role
+        if: github.event.client_payload.platform == 'aws' && github.event.client_payload.aws_role_arn
         uses: aws-actions/configure-aws-credentials@v2
         with:
           role-to-assume: ${{ github.event.client_payload.aws_role_arn }}
+          aws-region: ${{ github.event.client_payload.aws_region || 'us-east-1' }}
+
+      - name: Configure AWS Credentials for Access Keys
+        if: github.event.client_payload.platform == 'aws' && !github.event.client_payload.aws_role_arn
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ github.event.client_payload.aws_region || 'us-east-1' }}
@@ -46,37 +49,20 @@ jobs:
 
       - name: 'Build Packer Image'
         env:
-          # --- GCP ---
-          # The project ID is passed as a Packer variable.
-          # Authentication is handled by the 'Authenticate to Google Cloud' step above.
           PKR_VAR_gcp_project_id: ${{ secrets.GCP_PROJECT_ID }}
-
-          # --- Azure ---
-          # Pass Service Principal credentials as Packer variables.
           PKR_VAR_client_id: ${{ secrets.AZURE_CLIENT_ID }}
           PKR_VAR_client_secret: ${{ secrets.AZURE_CLIENT_SECRET }}
           PKR_VAR_subscription_id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
           PKR_VAR_tenant_id: ${{ secrets.AZURE_TENANT_ID }}
         run: |
-          # Export context variables to shell environment variables for safety and clarity
           export BUILD_ID="${{ github.run_id }}"
           export PLATFORM="${{ github.event.client_payload.platform }}"
-          export IMAGE_ID="${{ github.event.client_payload.image_id }}"
           export TEMPLATE_FILE="${{ github.event.client_payload.template_file }}"
           
-          # Log them for debugging purposes
-          echo "BUILD_ID is: $BUILD_ID"
-          echo "PLATFORM is: $PLATFORM"
-          echo "IMAGE_ID is: $IMAGE_ID"
-          echo "TEMPLATE_FILE is: $TEMPLATE_FILE"
-
-          # Check if the file exists in the root of the repository
           if [ ! -f "$TEMPLATE_FILE" ]; then
             echo "Error: Template file $TEMPLATE_FILE not found in the repository's root directory."
             exit 1
           fi
 
           packer init "$TEMPLATE_FILE"
-          
-          # Use the shell variables to pass arguments to Packer
           packer build -var "build_id=$BUILD_ID" -var "platform=$PLATFORM" "$TEMPLATE_FILE"
