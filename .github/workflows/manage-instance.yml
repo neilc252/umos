@@ -21,13 +21,13 @@ jobs:
 
       # --- GCP ---
       - name: Authenticate to Google Cloud
-        if: "${{ github.event.client_payload.platform == 'gcp' }}"
+        if: "github.event.client_payload.platform == 'gcp'"
         uses: 'google-github-actions/auth@v2'
         with:
           credentials_json: '${{ secrets.GCP_CREDENTIALS }}'
       
       - name: Manage GCP Instance
-        if: "${{ github.event.client_payload.platform == 'gcp' }}"
+        if: "github.event.client_payload.platform == 'gcp'"
         run: |
           gcloud compute instances ${{ github.event.client_payload.action }} ${{ github.event.client_payload.instance_name }} \
             --project=${{ github.event.client_payload.project_id }} \
@@ -36,14 +36,14 @@ jobs:
 
       # --- AWS ---
       - name: Configure AWS Credentials for IAM Role
-        if: "${{ github.event.client_payload.platform == 'aws' && github.event.client_payload.aws_role_arn }}"
+        if: "github.event.client_payload.platform == 'aws' && github.event.client_payload.aws_role_arn"
         uses: aws-actions/configure-aws-credentials@v2
         with:
           role-to-assume: '${{ github.event.client_payload.aws_role_arn }}'
           aws-region: '${{ github.event.client_payload.region || 'us-east-1' }}'
 
       - name: Configure AWS Credentials for Access Keys
-        if: "${{ github.event.client_payload.platform == 'aws' && !github.event.client_payload.aws_role_arn }}"
+        if: "github.event.client_payload.platform == 'aws' && !github.event.client_payload.aws_role_arn"
         uses: aws-actions/configure-aws-credentials@v2
         with:
           aws-access-key-id: '${{ secrets.AWS_ACCESS_KEY_ID }}'
@@ -51,7 +51,7 @@ jobs:
           aws-region: '${{ github.event.client_payload.region || 'us-east-1' }}'
 
       - name: Manage AWS EC2 Instance
-        if: "${{ github.event.client_payload.platform == 'aws' }}"
+        if: "github.event.client_payload.platform == 'aws'"
         run: |
           # Find the instance ID from its name tag. Include transient states in the filter.
           INSTANCE_ID=$(aws ec2 describe-instances --filters "Name=tag:Name,Values=${{ github.event.client_payload.instance_name }}" "Name=instance-state-name,Values=pending,running,shutting-down,stopped,stopping" --query 'Reservations[0].Instances[0].InstanceId' --output text)
@@ -84,13 +84,13 @@ jobs:
 
       # --- Azure ---
       - name: Azure Login
-        if: "${{ github.event.client_payload.platform == 'azure' }}"
+        if: "github.event.client_payload.platform == 'azure'"
         uses: azure/login@v1
         with:
           creds: '{"clientId":"${{ secrets.AZURE_CLIENT_ID }}","clientSecret":"${{ secrets.AZURE_CLIENT_SECRET }}","subscriptionId":"${{ secrets.AZURE_SUBSCRIPTION_ID }}","tenantId":"${{ secrets.AZURE_TENANT_ID }}"}'
 
       - name: Manage Azure VM
-        if: "${{ github.event.client_payload.platform == 'azure' }}"
+        if: "github.event.client_payload.platform == 'azure'"
         run: |
           ACTION="${{ github.event.client_payload.action }}"
           if [ "$ACTION" == "start" ]; then
