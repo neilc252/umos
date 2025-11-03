@@ -39,8 +39,16 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ github.event.client_payload.aws_region || 'us-east-1' }}
       
-      - name: Azure Login
-        if: github.event.client_payload.platform == 'azure'
+      - name: Azure Login with OIDC
+        if: github.event.client_payload.platform == 'azure' && github.event.client_payload.azure_auth_type == 'oidc'
+        uses: azure/login@v1
+        with:
+          client-id: ${{ github.event.client_payload.azure_client_id }}
+          tenant-id: ${{ github.event.client_payload.azure_tenant_id }}
+          subscription-id: ${{ github.event.client_payload.azure_subscription_id }}
+
+      - name: Azure Login with Client Secret
+        if: github.event.client_payload.platform == 'azure' && github.event.client_payload.azure_auth_type != 'oidc'
         uses: azure/login@v1
         with:
           creds: '{"clientId":"${{ secrets.AZURE_CLIENT_ID }}","clientSecret":"${{ secrets.AZURE_CLIENT_SECRET }}","subscriptionId":"${{ secrets.AZURE_SUBSCRIPTION_ID }}","tenantId":"${{ secrets.AZURE_TENANT_ID }}"}'
@@ -48,10 +56,6 @@ jobs:
       - name: 'Build Packer Image'
         env:
           PKR_VAR_gcp_project_id: ${{ secrets.GCP_PROJECT_ID }}
-          PKR_VAR_client_id: ${{ secrets.AZURE_CLIENT_ID }}
-          PKR_VAR_client_secret: ${{ secrets.AZURE_CLIENT_SECRET }}
-          PKR_VAR_subscription_id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-          PKR_VAR_tenant_id: ${{ secrets.AZURE_TENANT_ID }}
         run: |
           export BUILD_ID="${{ github.run_id }}"
           export PLATFORM="${{ github.event.client_payload.platform }}"
