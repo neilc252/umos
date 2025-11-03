@@ -1,90 +1,73 @@
-name: Deploy Instance from Custom Image
+name: Deploy Instance via Terraform
 
 on:
   repository_dispatch:
     types: [deploy-instance]
 
 permissions:
-  id-token: write # Required to fetch the OIDC token for AWS authentication.
-  contents: read  # Required for actions/checkout.
+  id-token: write # Required for cloud OIDC.
+  contents: read
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+
       - name: 'Debug: Show Webhook Payload'
         run: |
-          echo "Deploying instance: ${{ github.event.client_payload.instance_name }}"
-          echo "From image: ${{ github.event.client_payload.image_name }}"
+          echo "Deploying from Terraform directory: ${{ github.event.client_payload.terraform_directory }}"
           echo "Platform: ${{ github.event.client_payload.platform }}"
-          echo "Region/Location: ${{ github.event.client_payload.region }}"
-          echo "VM Size: ${{ github.event.client_payload.vm_size }}"
 
-      # --- GCP Deployment ---
+      # --- Cloud Authentication ---
       - name: Authenticate to Google Cloud
         if: github.event.client_payload.platform == 'gcp'
         uses: 'google-github-actions/auth@v2'
         with:
-          credentials_json: '${{ secrets.GCP_CREDENTIALS }}'
-      
-      - name: Deploy GCP Instance
-        if: github.event.client_payload.platform == 'gcp'
-        run: |
-          gcloud compute instances create ${{ github.event.client_payload.instance_name }} \
-            --project=${{ github.event.client_payload.project_id }} \
-            --zone=${{ github.event.client_payload.region }}-a \
-            --machine-type=${{ github.event.client_payload.vm_size }} \
-            --image=${{ github.event.client_payload.image_name }} \
-            --image-project=${{ github.event.client_payload.project_id }} \
-            --boot-disk-size=50GB \
-            --tags=managed-by-premieros
+          credentials_json: ${{ secrets.GCP_CREDENTIALS }}
 
-      # --- AWS Deployment ---
-      - name: Configure AWS Credentials
-        if: github.event.client_payload.platform == 'aws'
+      - name: Configure AWS Credentials for IAM Role
+        if: github.event.client_payload.platform == 'aws' && github.event.client_payload.aws_role_arn
         uses: aws-actions/configure-aws-credentials@v2
         with:
           role-to-assume: ${{ github.event.client_payload.aws_role_arn }}
-          aws-access-key-id: '${{ secrets.AWS_ACCESS_KEY_ID }}'
-          aws-secret-access-key: '${{ secrets.AWS_SECRET_ACCESS_KEY }}'
-          aws-region: ${{ github.event.client_payload.region || 'us-east-1' }}
+          aws-region: ${{ github.event.client_payload.region }}
 
-      - name: Deploy AWS EC2 Instance
-        if: github.event.client_payload.platform == 'aws'
-        run: |
-          AMI_ID=$(aws ec2 describe-images --owners self --filters "Name=name,Values=${{ github.event.client_payload.image_name }}" --query 'Images[0].ImageId' --output text)
-          if [ -z "$AMI_ID" ] || [ "$AMI_ID" == "None" ]; then
-            echo "AMI with name '${{ github.event.client_payload.image_name }}' not found."
-            exit 1
-          fi
-          echo "Found AMI ID: $AMI_ID"
-          aws ec2 run-instances \
-            --image-id $AMI_ID \
-            --instance-type ${{ github.event.client_payload.vm_size }} \
-            --count 1 \
-            --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=${{ github.event.client_payload.instance_name }}}]'
+      - name: Configure AWS Credentials for Access Keys
+        if: github.event.client_payload.platform == 'aws' && !github.event.client_payload.aws_role_arn
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ github.event.client_payload.region }}
 
-      # --- Azure Deployment ---
-      - name: Azure Login
-        if: github.event.client_payload.platform == 'azure'
+      - name: Azure Login with OIDC
+        if: github.event.client_payload.platform == 'azure' && github.event.client_payload.azure_auth_type == 'oidc'
+        uses: azure/login@v1
+        with:
+          client-id: ${{ github.event.client_payload.azure_client_id }}
+          tenant-id: ${{ github.event.client_payload.azure_tenant_id }}
+          subscription-id: ${{ github.event.client_payload.azure_subscription_id }}
+
+      - name: Azure Login with Client Secret
+        if: github.event.client_payload.platform == 'azure' && github.event.client_payload.azure_auth_type != 'oidc'
         uses: azure/login@v1
         with:
           creds: '{"clientId":"${{ secrets.AZURE_CLIENT_ID }}","clientSecret":"${{ secrets.AZURE_CLIENT_SECRET }}","subscriptionId":"${{ secrets.AZURE_SUBSCRIPTION_ID }}","tenantId":"${{ secrets.AZURE_TENANT_ID }}"}'
+      
+      # --- Terraform Execution ---
+      - name: Terraform Init
+        id: init
+        run: terraform -chdir=${{ github.event.client_payload.terraform_directory }} init
 
-      - name: Deploy Azure VM
-        if: github.event.client_payload.platform == 'azure'
-        run: |
-          IMAGE_ID=$(az image show --resource-group ${{ github.event.client_payload.resource_group }} --name ${{ github.event.client_payload.image_name }} --query id -o tsv)
-          if [ -z "$IMAGE_ID" ]; then
-            echo "Image with name '${{ github.event.client_payload.image_name }}' not found in resource group '${{ github.event.client_payload.resource_group }}'."
-            exit 1
-          fi
-          echo "Found Image ID: $IMAGE_ID"
-          az vm create \
-            --resource-group ${{ github.event.client_payload.resource_group }} \
-            --name ${{ github.event.client_payload.instance_name }} \
-            --image $IMAGE_ID \
-            --size ${{ github.event.client_payload.vm_size }} \
-            --admin-username premieros-user \
-            --generate-ssh-keys \
-            --tags managed-by=premieros
+      - name: Terraform Validate
+        id: validate
+        run: terraform -chdir=${{ github.event.client_payload.terraform_directory }} validate -no-color
+
+      - name: Terraform Apply
+        id: apply
+        run: terraform -chdir=${{ github.event.client_payload.terraform_directory }} apply -auto-approve -no-color
