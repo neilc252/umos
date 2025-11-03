@@ -76,7 +76,7 @@ jobs:
         run: |
           gcloud compute instances ${{ github.event.client_payload.action }} ${{ github.event.client_payload.instance_name }} \
             --project=${{ github.event.client_payload.project_id }} \
-            --zone=${{ github.event.client_payload.region }}-a \
+            --zone=${{ github.event.client_payload.region }} \
             --quiet
 
       - name: Start/Stop AWS EC2 Instance
