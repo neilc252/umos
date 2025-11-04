@@ -6,7 +6,7 @@ on:
 
 permissions:
   id-token: write # Required for cloud OIDC.
-  contents: read
+  contents: write # Required to commit the IP address file.
 
 jobs:
   deploy:
@@ -74,11 +74,14 @@ jobs:
         id: apply
         run: terraform -chdir=${{ github.event.client_payload.terraform_directory }} apply -auto-approve -no-color
       
-      - name: Expose IP Address Output
+      - name: Commit IP Address File
         if: steps.apply.outcome == 'success'
-        id: get_ip
         run: |
           IP_ADDRESS=$(terraform -chdir=${{ github.event.client_payload.terraform_directory }} output -raw private_ip)
-          echo "--- PRIVATE IP ADDRESS ---"
-          echo "INSTANCE_IP::$IP_ADDRESS"
-          echo "--------------------------"
+          IP_FILE_PATH="${{ github.event.client_payload.terraform_directory }}/instance.ip"
+          echo -n "$IP_ADDRESS" > "$IP_FILE_PATH"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add "$IP_FILE_PATH"
+          git commit -m "ci: Record IP for instance ${{ github.event.client_payload.instance_name }}"
+          git push
