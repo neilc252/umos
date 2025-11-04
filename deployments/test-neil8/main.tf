@@ -1,63 +1,69 @@
-terraform {
-  required_providers {
-    google = {
-      source  = "hashicorp/google"
-      version = "~> 4.0" # Specify a suitable version constraint for the Google provider
-    }
-  }
-}
-
 # Configure the Google Cloud provider
+# This block sets up the authentication and default project/region for subsequent resources.
 provider "google" {
-  # The GCP project ID where resources will be deployed
   project = "umos-ab24d"
-  # The region for resource deployment
   region  = "us-central1"
+  # Optional: You can specify a zone here, or let resources inherit from the region and pick a default.
+  # zone    = "us-central1-a"
 }
 
-# Resource block for the Google Compute Instance
+# Resource: Google Compute Engine Virtual Machine
+# Deploys a new virtual machine instance with the specified configuration.
 resource "google_compute_instance" "this_vm" {
-  # Name of the virtual machine instance
+  # The unique name for the virtual machine instance within the project.
   name         = "test-neil8"
-  # Zone where the VM will be deployed. Picked a default zone within the specified region.
-  zone         = "us-central1-a"
-  # Machine type (VM size) for the instance
+  # The machine type defines the virtual hardware resources (CPU, memory).
   machine_type = "e2-micro"
-  # Explicitly set the project ID for the instance, as per instructions
-  project      = "umos-ab24d"
+  # The zone where the virtual machine will be deployed.
+  # We are picking a specific zone within the configured region.
+  zone         = "us-central1-a" # Using a specific zone within the region.
+  # Critical: Set deletion_protection to false as per instructions.
+  deletion_protection = false
 
-  # Boot disk configuration for the VM
+  # Boot Disk Configuration: Defines the primary disk for the VM.
   boot_disk {
     initialize_params {
-      # Specifies the custom image to be used for the boot disk
-      # This image name comes directly from the configuration's 'os.name'
+      # The custom image to use for the boot disk.
+      # This uses the specific pre-built custom image ID provided.
       image = "ubuntu-20-04-gcp-19045279782"
     }
   }
 
-  # Network interface configuration
+  # Network Interface Configuration: Connects the VM to a network.
   network_interface {
-    # Uses the default VPC network
+    # The name of the VPC network to which this VM will be attached.
+    # "default" is the standard network created in every GCP project.
     network = "default"
-    # To assign an ephemeral public IP, uncomment the following block:
+
+    # Optional: To assign a public IP address, uncomment the access_config block.
+    # For this deployment, we're assuming no public IP is strictly required unless specified.
     # access_config {
-    #   # An empty access_config block assigns an ephemeral external IP address
+    #   # Ephemeral IP address will be assigned
     # }
   }
 
-  # Set deletion protection to false, as per critical instructions
-  # This allows the instance to be deleted via Terraform
-  deletion_protection = false
+  # Optional: Metadata can be used to pass startup scripts or other data to the instance.
+  # This configuration does not explicitly enable a startup script via metadata.
+  # metadata_startup_script = "#!/bin/bash\n# User data scripts are not yet supported for direct deployment.\n"
 
-  # The customScript from the configuration indicates user data scripts are not
-  # directly supported for this type of deployment. If it were a real script,
-  # it would typically be passed via `metadata_startup_script`.
-  # metadata_startup_script = "#!/bin/bash\necho 'Hello from startup script!'"
+  # Optional: Labels are key-value pairs that help organize and manage your GCP resources.
+  labels = {
+    environment = "dev"
+    owner       = "devops-team"
+  }
+
+  # Optional: Service account for the VM to interact with other GCP services.
+  # It's good practice to assign a service account with minimal necessary permissions.
+  # service_account {
+  #   email  = "default" # Use the default compute service account
+  #   scopes = ["cloud-platform"] # Grant broad access, restrict as needed
+  # }
 }
 
-# Output block to expose the private IP address of the created virtual machine
+# Output Block: Exposes important information about the created resources.
 output "private_ip" {
-  description = "The private IP address of the created virtual machine."
-  # Accesses the private IP from the first network interface of the VM
+  # Description of the output value.
+  description = "The private IP address of the deployed virtual machine."
+  # The value is retrieved from the network_interface of the created instance.
   value       = google_compute_instance.this_vm.network_interface[0].network_ip
 }
