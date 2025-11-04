@@ -1,31 +1,24 @@
-terraform {
-  required_providers {
-    google = {
-      source  = "hashicorp/google"
-      version = "~> 4.0"
-    }
-  }
-}
-
 # Configure the Google Cloud provider
+# Ensure you have authenticated Terraform with GCP (e.g., using `gcloud auth application-default login`)
 provider "google" {
   project = "umos-ab24d"
   region  = "us-central1"
 }
 
-# Resource for a Google Compute Engine virtual machine instance
-resource "google_compute_instance" "vm_instance" {
+# Resource: Google Compute Engine Virtual Machine
+# Deploys a virtual machine instance named "this_vm"
+resource "google_compute_instance" "this_vm" {
   # The name of the virtual machine instance
   name = "test-neil2"
 
   # The machine type (e.g., e2-micro, n1-standard-1)
   machine_type = "e2-micro"
 
-  # The zone where the VM will be deployed.
-  # For instances, a specific zone is required, not just a region.
+  # The zone where the VM instance will be created.
+  # A specific zone within the specified region (us-central1) is required for instance creation.
   zone = "us-central1-a"
 
-  # Set the project ID for this resource explicitly
+  # Project ID for the instance, explicitly set to ensure it's correct.
   project = "umos-ab24d"
 
   # Boot disk configuration
@@ -33,40 +26,52 @@ resource "google_compute_instance" "vm_instance" {
     initialize_params {
       # Custom image name for the boot disk.
       # This image is expected to be available in the specified project.
-      image = "ubuntu-20.04-gcp-1762194682673"
+      image = "ubuntu-20-04-gcp-19045279782"
     }
   }
 
   # Network interface configuration
   network_interface {
-    # Connect to the 'default' VPC network
+    # Connects the VM to the 'default' VPC network.
+    # If a specific network is required, it should be defined elsewhere.
     network = "default"
 
-    # Access configuration to assign an external IP address
-    access_config {
-      # No parameters needed for default external IP
-    }
+    # No access_config block means the VM will only have a private IP and no external IP.
+    # If public access is needed, an access_config {} block should be added.
   }
 
-  # Prevent accidental deletion of the instance.
-  # Set to 'false' as per requirements for this deployment.
+  # Set deletion_protection to false as per requirements.
   deletion_protection = false
 
-  # Metadata startup script.
-  # The original configuration noted "User data scripts are not yet supported for direct deployment."
-  # For GCP, startup scripts are passed via metadata.
-  # If a script were to be used, it would look like this:
-  # metadata_startup_script = "#!/bin/bash\n# User data scripts are not yet supported for direct deployment.\n"
-  # Since the original customScript indicated it's not directly supported, we'll omit it for a clean deployment.
-
-  # Service account to grant permissions to the VM.
-  # Recommended to specify a service account with minimal necessary permissions.
-  # For basic testing, the default compute engine service account is often used.
+  # Define an array of service accounts to associate with the instance.
+  # This grants the VM permissions to interact with GCP services.
+  # If specific permissions are needed, create a dedicated service account and roles.
   service_account {
-    email  = "default" # Uses the default Compute Engine service account
-    scopes = ["cloud-platform"] # Grants broad access, refine for production
+    scopes = [
+      "https://www.googleapis.com/auth/cloud-platform",
+    ]
   }
 
-  # Tags for network firewall rules, etc.
-  tags = ["http-server", "https-server"]
+  # Optional: Apply metadata to the instance
+  # The custom script from the configuration is noted as not directly supported
+  # for this deployment type and custom image scenario.
+  # If a startup script is required, it can be added here using `metadata_startup_script`.
+  # For example:
+  # metadata_startup_script = "#!/bin/bash\necho 'Hello from startup script!'"
+
+  # Labels are optional key-value pairs that help organize and manage resources.
+  labels = {
+    environment = "dev"
+    created_by  = "terraform"
+  }
+
+  # Comments for the instance, visible in the GCP Console.
+  description = "Virtual machine deployed via Terraform using a custom Ubuntu image."
+}
+
+# Output block: private_ip
+# Exports the private IP address of the created virtual machine.
+output "private_ip" {
+  description = "The private IP address of the virtual machine."
+  value       = google_compute_instance.this_vm.network_interface[0].network_ip
 }
