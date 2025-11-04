@@ -84,7 +84,7 @@ jobs:
           TF_DIR="${{ github.event.client_payload.terraform_directory }}"
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git rm -r "$TF_DIR"
+          git rm -r -f "$TF_DIR"
           git commit -m "ci: Destroy instance ${{ github.event.client_payload.instance_name }} and remove configuration"
           git push
 
