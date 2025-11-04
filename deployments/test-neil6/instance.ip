@@ -1,5 +1,0 @@
-[command]/home/runner/work/_temp/c4bdf88d-f892-47e5-be52-8ab10ec5da46/terraform-bin -chdir=deployments/test-neil6 output -raw private_ip
-10.128.0.41::debug::Terraform exited with code 0.
-::debug::stdout: 10.128.0.41
-::debug::stderr: 
-::debug::exitcode: 0
