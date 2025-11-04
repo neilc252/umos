@@ -1,59 +1,64 @@
+# Configure the Google Cloud provider
+# The project and region are derived from the configuration.
 provider "google" {
   project = "umos-ab24d"
   region  = "us-central1"
 }
 
+# Resource for the Google Compute Engine virtual machine
+# The resource is named 'this_vm' as per critical instructions.
 resource "google_compute_instance" "this_vm" {
-  # Naming the primary compute resource as "this_vm" as required.
-  name         = "test-neil5"
-  machine_type = "e2-micro"
-  zone         = "us-central1-a" # A specific zone within the specified region
+  # The name of the virtual machine instance
+  name = "test-neil5"
 
-  # Pre-built custom image as specified in the configuration.
-  # The 'image' parameter directly uses the provided image name.
+  # The machine type defines the VM's CPU and memory
+  machine_type = "e2-micro"
+
+  # The zone where the VM will be deployed.
+  # A default zone in the specified region is chosen.
+  zone = "us-central1-a"
+
+  # The Google Cloud Project ID where the VM will be created.
+  # This comes directly from the 'gcp_project_id' in the configuration.
+  project = "umos-ab24d"
+
+  # Boot disk configuration for the virtual machine
   boot_disk {
     initialize_params {
+      # The custom image to use for the boot disk.
+      # This name is taken directly from the critical instructions.
       image = "ubuntu-20-04-gcp-19045279782"
     }
   }
 
+  # Network interface configuration for the VM
   network_interface {
-    # Using the default network available in most GCP projects.
+    # Connects the VM to the 'default' VPC network.
+    # Adjust this if a specific network is required.
     network = "default"
-    # An access_config block is needed to assign an external IP address,
-    # allowing internet connectivity. Though not strictly required for private_ip output,
-    # it's common practice for instances that need to reach the internet.
+
+    # An access_config block assigns an ephemeral public IP address to the VM.
+    # Remove this block if only a private IP is desired.
     access_config {
-      # Ephemeral IP - Google will assign a public IP address.
+      # An empty block means an ephemeral external IP address will be assigned.
     }
   }
 
-  # Ensure deletion_protection is set to false as required.
+  # Set deletion protection to false as required by the instructions.
+  # This allows the VM to be deleted via Terraform without manual intervention.
   deletion_protection = false
 
-  # Allowing the instance to be stopped for updates without replacement.
-  allow_stopping_for_update = true
-
-  # Custom script (user data) is explicitly mentioned as not directly supported
-  # for deployment via this mechanism based on the input configuration.
-  # If needed, this would typically go into metadata_startup_script.
-  # metadata_startup_script = "#!/bin/bash\n# User data scripts are not yet supported for direct deployment.\n"
-
-  # Labels can be added for organization and billing.
-  labels = {
-    env  = "dev"
-    owner = "infrastructure-team"
-  }
-
-  # Enable guest OS features like shield VM, if desired
-  # guest_accelerator {
-  #   type  = "nvidia-tesla-v100"
-  #   count = 1
+  # Optional: Metadata can be used for startup scripts or other instance properties.
+  # For example, to run a startup script:
+  # metadata = {
+  #   startup-script = "#!/bin/bash\n echo 'Hello from startup script!' > /tmp/startup.txt"
   # }
 }
 
-# Output block to expose the private IP address of the created VM.
+# Output block to expose the private IP address of the created virtual machine.
+# This follows the naming convention 'private_ip' as per critical instructions.
 output "private_ip" {
-  description = "The private IP address of the virtual machine."
+  description = "The private IP address of the deployed virtual machine."
+  # The value correctly references the network_ip from the first network interface.
   value       = google_compute_instance.this_vm.network_interface[0].network_ip
 }
