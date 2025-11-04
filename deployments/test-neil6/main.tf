@@ -1,60 +1,55 @@
-# Configure the Google Cloud provider
 provider "google" {
-  # The GCP project ID where resources will be deployed
   project = "umos-ab24d"
-  # The GCP region for resource deployment
   region  = "us-central1"
 }
 
-# Resource block for the Google Compute Engine Virtual Machine
 resource "google_compute_instance" "this_vm" {
-  # CRITICAL INSTRUCTION: The primary compute resource MUST be named "this_vm"
-  name         = "test-neil6" # Instance name from the configuration
-  machine_type = "e2-micro"   # Machine type (VM size) from the configuration
-  # GCP instances require a zone. Since only a region was provided,
-  # we append '-a' to the region to specify a default zone within it.
-  zone         = "us-central1-a"
-  project      = "umos-ab24d" # CRITICAL INSTRUCTION: Use gcp_project_id for the project field
+  # The name of the virtual machine instance
+  name         = "test-neil6"
+  # The machine type for the VM (e.g., e2-micro, n1-standard-1)
+  machine_type = "e2-micro"
+  # The zone where the VM will be deployed. It should be within the specified region.
+  zone         = "us-central1-b" # Using a default zone within us-central1
 
-  # CRITICAL INSTRUCTION: Use 'deletion_protection = false'
-  deletion_protection = false
-
-  # Configuration for the boot disk of the virtual machine
+  # Boot disk configuration
   boot_disk {
     initialize_params {
-      # CRITICAL INSTRUCTION: Use the custom image name directly from the configuration
-      # This specifies the pre-built custom image to be used for the VM's boot disk.
+      # The custom image for the boot disk.
+      # This is a pre-built custom image as specified in the instructions.
       image = "ubuntu-20-04-gcp-19045279782"
     }
   }
 
-  # Configuration for the network interface
+  # Network interface configuration
   network_interface {
-    # Assumes a 'default' network exists in the specified project and region.
-    # If a specific network is required, it should be defined or referenced here.
+    # The network to attach the VM to. 'default' is the common choice if not specified.
     network = "default"
-
-    # Optional: Add an access_config block if an external (public) IP address is needed.
+    # To assign an external IP address, add an access_config block.
     # access_config {
-    #   # This block configures an ephemeral public IP address.
+    #   # Ephemeral IP
     # }
   }
 
-  # The 'customScript' field in the input indicates that user data scripts
-  # are not directly supported for this deployment method, so metadata_startup_script
-  # is intentionally omitted.
+  # Set deletion protection to false as per instructions.
+  deletion_protection = false
 
-  # Optional: Add labels for better resource management and identification
-  labels = {
-    environment = "dev"
-    owner       = "devops-team"
-    created_by  = "terraform"
-  }
+  # Optional: Metadata for startup scripts or other configurations.
+  # metadata = {
+  #   startup-script = "#!/bin/bash\n# User data scripts are not yet supported for direct deployment."
+  # }
+
+  # The project ID where the instance will be created.
+  project = "umos-ab24d"
+
+  # A list of service accounts to use for the instance.
+  # service_account {
+  #   email  = "default"
+  #   scopes = ["cloud-platform"]
+  # }
 }
 
-# CRITICAL INSTRUCTION: Output block named "private_ip"
+# Output block to expose the private IP address of the virtual machine.
 output "private_ip" {
-  description = "The private IP address of the created virtual machine."
-  # CRITICAL INSTRUCTION: For GCP, the value must be network_interface[0].network_ip
+  description = "The private IP address of the created VM."
   value       = google_compute_instance.this_vm.network_interface[0].network_ip
 }
