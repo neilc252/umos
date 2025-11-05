@@ -1,64 +1,68 @@
-# Configure the Google Cloud provider
-# The project and region are derived from the configuration.
-provider "google" {
-  project = "umos-ab24d"
-  region  = "us-central1"
+# Configure Terraform Cloud for state management and remote operations
+terraform {
+  # Define required providers and their versions
+  required_providers {
+    google = {
+      source  = "hashicorp/google"
+      version = "~> 5.0" # Specify a compatible version range for the Google provider
+    }
+  }
+
+  # Configure Terraform Cloud integration
+  cloud {
+    organization = "PremierDataMigration" # Terraform Cloud organization name
+
+    # Define the workspace to use within the organization
+    workspaces {
+      name = "test-neil5" # Terraform Cloud workspace name
+    }
+  }
 }
 
-# Resource for the Google Compute Engine virtual machine
-# The resource is named 'this_vm' as per critical instructions.
+# Configure the Google Cloud Platform provider
+# The 'project' and 'region' are essential for deploying resources to GCP.
+provider "google" {
+  project = "umos-ab24d"    # Your GCP project ID
+  region  = "us-central1" # The default region for resource deployment
+}
+
+# Resource block to create a Google Compute Engine virtual machine instance
 resource "google_compute_instance" "this_vm" {
-  # The name of the virtual machine instance
-  name = "test-neil5"
+  name         = "test-neil5"  # Name of the virtual machine instance
+  machine_type = "e2-micro"      # Machine type (size) of the VM
+  zone         = "us-central1-a" # Zone where the VM will be deployed (derived from region)
 
-  # The machine type defines the VM's CPU and memory
-  machine_type = "e2-micro"
-
-  # The zone where the VM will be deployed.
-  # A default zone in the specified region is chosen.
-  zone = "us-central1-a"
-
-  # The Google Cloud Project ID where the VM will be created.
-  # This comes directly from the 'gcp_project_id' in the configuration.
-  project = "umos-ab24d"
-
-  # Boot disk configuration for the virtual machine
+  # Configure the boot disk for the VM
   boot_disk {
     initialize_params {
-      # The custom image to use for the boot disk.
-      # This name is taken directly from the critical instructions.
+      # Use the custom image name provided in the configuration
       image = "ubuntu-20-04-gcp-19045279782"
     }
   }
 
-  # Network interface configuration for the VM
+  # Configure network interfaces for the VM
   network_interface {
-    # Connects the VM to the 'default' VPC network.
-    # Adjust this if a specific network is required.
-    network = "default"
+    network = "default" # Use the default VPC network
 
-    # An access_config block assigns an ephemeral public IP address to the VM.
-    # Remove this block if only a private IP is desired.
-    access_config {
-      # An empty block means an ephemeral external IP address will be assigned.
-    }
+    # Access config to assign an ephemeral public IP address
+    # Remove this block if only private IP access is desired
+    access_config {}
   }
 
-  # Set deletion protection to false as required by the instructions.
-  # This allows the VM to be deleted via Terraform without manual intervention.
+  # Apply a startup script to the VM
+  metadata_startup_script = "#!/bin/bash\n# User data scripts are not yet supported for direct deployment.\n"
+
+  # Critical instruction: Disable deletion protection
   deletion_protection = false
 
-  # Optional: Metadata can be used for startup scripts or other instance properties.
-  # For example, to run a startup script:
-  # metadata = {
-  #   startup-script = "#!/bin/bash\n echo 'Hello from startup script!' > /tmp/startup.txt"
-  # }
+  # Optional: Tags can be used for network firewall rules, load balancers, etc.
+  # tags = ["web-server", "http-server"]
 }
 
-# Output block to expose the private IP address of the created virtual machine.
-# This follows the naming convention 'private_ip' as per critical instructions.
+# Output block to expose the private IP address of the created VM
+# This value can be easily retrieved after deployment using 'terraform output'
 output "private_ip" {
-  description = "The private IP address of the deployed virtual machine."
-  # The value correctly references the network_ip from the first network interface.
+  description = "The private IP address of the virtual machine."
+  # For GCP, the private IP is found within the network_interface block
   value       = google_compute_instance.this_vm.network_interface[0].network_ip
 }
