@@ -11,6 +11,8 @@ permissions:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    env:
+      TF_API_TOKEN: ${{ secrets.TF_API_TOKEN }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
@@ -64,26 +66,18 @@ jobs:
       # --- Terraform Execution ---
       - name: Terraform Init
         id: init
-        env:
-          TF_API_TOKEN: ${{ secrets.TF_API_TOKEN }}
         run: terraform -chdir=${{ github.event.client_payload.terraform_directory }} init
 
       - name: Terraform Validate
         id: validate
-        env:
-          TF_API_TOKEN: ${{ secrets.TF_API_TOKEN }}
         run: terraform -chdir=${{ github.event.client_payload.terraform_directory }} validate -no-color
 
       - name: Terraform Apply
         id: apply
-        env:
-          TF_API_TOKEN: ${{ secrets.TF_API_TOKEN }}
         run: terraform -chdir=${{ github.event.client_payload.terraform_directory }} apply -auto-approve -no-color
       
       - name: Commit IP Address
         if: steps.apply.outcome == 'success'
-        env:
-          TF_API_TOKEN: ${{ secrets.TF_API_TOKEN }}
         run: |
           TF_DIR="${{ github.event.client_payload.terraform_directory }}"
           # The output from terraform can sometimes be polluted with runner debug info.
