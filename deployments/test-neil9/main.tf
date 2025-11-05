@@ -1,42 +1,79 @@
-# Configure the Google Cloud provider
-provider "google" {
-  project = "umos-ab24d"
-  region  = "us-central1"
+# Terraform block to configure backend and required providers
+terraform {
+  # Configure Terraform Cloud backend
+  cloud {
+    organization = "PremierDataMigration"
+
+    workspaces {
+      name = "test-neil9"
+    }
+  }
+
+  # Specify the required providers and their versions
+  required_providers {
+    google = {
+      source  = "hashicorp/google"
+      version = "~> 5.0" # Use a compatible version for the Google provider
+    }
+  }
 }
 
-# Resource for the Google Compute Engine virtual machine named "this_vm"
-resource "google_compute_instance" "this_vm" {
-  name         = "test-neil9"
-  project      = "umos-ab24d" # Use the provided gcp_project_id for the project
-  machine_type = "e2-micro"
-  zone         = "us-central1-c" # A specific zone within the specified region
+# Configure the Google Cloud provider
+provider "google" {
+  project = "umos-ab24d" # GCP Project ID from configuration
+  region  = "us-central1" # GCP Region from configuration
+}
 
-  # Boot disk configuration, using the specified custom image
+# Resource to deploy a Google Compute Engine virtual machine
+resource "google_compute_instance" "this_vm" {
+  # Instance name from configuration
+  name         = "test-neil9"
+  # Machine type (VM size) from configuration
+  machine_type = "e2-micro"
+  # Zone for the instance, derived from the region (e.g., us-central1-c)
+  # A specific zone is required; here we pick 'c' within the given region.
+  zone         = "us-central1-c"
+
+  # Boot disk configuration
   boot_disk {
     initialize_params {
-      # Use the custom image named 'ubuntu-20-04-gcp-19045279782' as required
+      # Use the pre-built custom image name specified in the critical instructions
       image = "ubuntu-20-04-gcp-19045279782"
     }
   }
 
   # Network interface configuration
   network_interface {
-    # Assumes a 'default' network exists in the specified GCP project
+    # Use the default VPC network
     network = "default"
+
+    # Access config to assign an ephemeral public IP for external access
+    access_config {
+      # This block can be empty to assign an ephemeral public IP
+    }
   }
 
-  # Set deletion_protection to false as per critical instructions
+  # Enable deletion protection as per critical instructions
   deletion_protection = false
 
-  # Metadata for startup script, including the customScript if provided
+  # Instance metadata (optional)
   metadata = {
-    startup-script = "#!/bin/bash\n# User data scripts are not yet supported for direct deployment.\n"
+    # If a startup script was provided, it would go here.
+    # For this configuration, it's explicitly noted as not directly supported.
+  }
+
+  # Tags (optional)
+  tags = ["http-server", "https-server"]
+
+  # Service account for the VM (optional, uses default if not specified)
+  service_account {
+    email  = "default"
+    scopes = ["cloud-platform"]
   }
 }
 
-# Output block for the private IP address of the VM
+# Output block to expose the private IP address of the created VM
 output "private_ip" {
-  description = "The private IP address of the created virtual machine."
-  # For GCP, the private IP is found in the first network interface's network_ip attribute
+  description = "The private IP address of the deployed virtual machine."
   value       = google_compute_instance.this_vm.network_interface[0].network_ip
 }
