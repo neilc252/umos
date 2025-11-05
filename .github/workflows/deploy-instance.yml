@@ -11,8 +11,6 @@ permissions:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    env:
-      TF_API_TOKEN: ${{ secrets.TF_API_TOKEN }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
