@@ -24,7 +24,8 @@ jobs:
         if: github.event.client_payload.platform == 'gcp'
         uses: 'google-github-actions/auth@v2'
         with:
-          credentials_json: ${{ secrets.GCP_CREDENTIALS }}
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
 
       - name: Configure AWS Credentials for IAM Role
         if: github.event.client_payload.platform == 'aws' && github.event.client_payload.aws_role_arn
@@ -53,11 +54,11 @@ jobs:
         if: github.event.client_payload.platform == 'azure' && github.event.client_payload.azure_auth_type != 'oidc'
         uses: azure/login@v1
         with:
-          creds: '{"clientId":"${{ secrets.AZURE_CLIENT_ID }}","clientSecret":"${{ secrets.AZURE_CLIENT_SECRET }}","subscriptionId":"${{ secrets.AZURE_SUBSCRIPTION_ID }}","tenantId":"${{ secrets.AZURE_TENANT_ID }}"}'
+          creds: '{"clientId":"${{ github.event.client_payload.azure_client_id }}","clientSecret":"${{ secrets.AZURE_CLIENT_SECRET }}","subscriptionId":"${{ github.event.client_payload.azure_subscription_id }}","tenantId":"${{ github.event.client_payload.azure_tenant_id }}"}'
 
       - name: 'Build Packer Image'
         env:
-          PKR_VAR_gcp_project_id: ${{ secrets.GCP_PROJECT_ID }}
+          PKR_VAR_gcp_project_id: ${{ github.event.client_payload.gcp_project_id }}
         run: |
           export BUILD_ID="${{ github.run_id }}"
           export PLATFORM="${{ github.event.client_payload.platform }}"
