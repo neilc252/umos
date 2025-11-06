@@ -74,7 +74,7 @@ jobs:
         id: apply
         run: terraform -chdir=${{ github.event.client_payload.terraform_directory }} apply -auto-approve -no-color
       
-      - name: Commit IP Address
+      - name: Commit IP Address and State
         if: steps.apply.outcome == 'success'
         run: |
           TF_DIR="${{ github.event.client_payload.terraform_directory }}"
@@ -88,11 +88,12 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           
           git add "$TF_DIR/instance.ip"
+          git add "$TF_DIR/terraform.tfstate"
           
           # Only commit if there are staged changes
           if ! git diff --staged --quiet; then
-            git commit -m "ci: Update IP for instance ${{ github.event.client_payload.instance_name }}"
+            git commit -m "ci: Deploy ${{ github.event.client_payload.instance_name }} and save state"
             git push
           else
-            echo "No IP changes to commit."
+            echo "No state or IP changes to commit."
           fi
