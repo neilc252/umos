@@ -75,8 +75,8 @@ jobs:
               -var "build_id=$BUILD_ID" \
               -var "platform=$PLATFORM" \
               -var "vm_size=${{ github.event.client_payload.vm_size }}" \
-              -var "managed_image_rg=${{ github.event.client_payload.managed_image_rg }}" \
-              -var "build_resource_group_name=${{ github.event.client_payload.build_resource_group_name }}" \
+              -var "managed_image_rg=${{ github.event.client_payload.azure_resource_group }}" \
+              -var "build_resource_group_name=${{ github.event.client_payload.azure_resource_group }}" \
               "$TEMPLATE_FILE"
           else
             packer build \
