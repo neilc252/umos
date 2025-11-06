@@ -68,27 +68,24 @@ jobs:
             exit 1
           fi
 
-          # Conditionally set the vm_size variable to avoid passing an empty string,
-          # which would override Packer's HCL default value.
-          VM_SIZE_ARG=""
+          # Build up packer arguments dynamically
+          PACKER_ARGS="-var=build_id=$BUILD_ID -var=platform=$PLATFORM"
+
+          # VM Size argument (conditionally)
           if [ -n "${{ github.event.client_payload.vm_size }}" ]; then
-            VM_SIZE_ARG="-var=vm_size=${{ github.event.client_payload.vm_size }}"
+            PACKER_ARGS="$PACKER_ARGS -var=vm_size=${{ github.event.client_payload.vm_size }}"
+          fi
+
+          # Platform-specific arguments
+          if [ "$PLATFORM" == "azure" ]; then
+            PACKER_ARGS="$PACKER_ARGS -var=managed_image_rg=${{ github.event.client_payload.azure_resource_group }}"
+            PACKER_ARGS="$PACKER_ARGS -var=build_resource_group_name=${{ github.event.client_payload.azure_resource_group }}"
+          elif [ "$PLATFORM" == "aws" ]; then
+            # The region payload defaults to us-east-1 if not set
+            PACKER_ARGS="$PACKER_ARGS -var=region=${{ github.event.client_payload.aws_region }}"
           fi
 
           packer init "$TEMPLATE_FILE"
           
-          if [ "$PLATFORM" == "azure" ]; then
-            packer build \
-              -var "build_id=$BUILD_ID" \
-              -var "platform=$PLATFORM" \
-              -var "managed_image_rg=${{ github.event.client_payload.azure_resource_group }}" \
-              -var "build_resource_group_name=${{ github.event.client_payload.azure_resource_group }}" \
-              $VM_SIZE_ARG \
-              "$TEMPLATE_FILE"
-          else
-            packer build \
-              -var "build_id=$BUILD_ID" \
-              -var "platform=$PLATFORM" \
-              $VM_SIZE_ARG \
-              "$TEMPLATE_FILE"
-          fi
+          # Use eval to handle the string of arguments correctly
+          eval packer build $PACKER_ARGS "$TEMPLATE_FILE"
