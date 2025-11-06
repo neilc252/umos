@@ -68,10 +68,18 @@ jobs:
             exit 1
           fi
 
-          EXTRA_VARS=""
-          if [ "$PLATFORM" == "azure" ]; then
-            EXTRA_VARS="-var 'managed_image_rg=${{ github.event.client_payload.managed_image_rg }}' -var 'location=${{ github.event.client_payload.location }}'"
-          fi
-
           packer init "$TEMPLATE_FILE"
-          packer build -var "build_id=$BUILD_ID" -var "platform=$PLATFORM" $EXTRA_VARS "$TEMPLATE_FILE"
+          
+          if [ "$PLATFORM" == "azure" ]; then
+            packer build \
+              -var "build_id=$BUILD_ID" \
+              -var "platform=$PLATFORM" \
+              -var "managed_image_rg=${{ github.event.client_payload.managed_image_rg }}" \
+              -var "location=${{ github.event.client_payload.location }}" \
+              "$TEMPLATE_FILE"
+          else
+            packer build \
+              -var "build_id=$BUILD_ID" \
+              -var "platform=$PLATFORM" \
+              "$TEMPLATE_FILE"
+          fi
