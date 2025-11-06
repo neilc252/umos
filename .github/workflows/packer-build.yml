@@ -56,18 +56,6 @@ jobs:
           creds: '{"clientId":"${{ github.event.client_payload.azure_client_id }}","clientSecret":"${{ secrets.AZURE_CLIENT_SECRET }}","subscriptionId":"${{ github.event.client_payload.azure_subscription_id }}","tenantId":"${{ github.event.client_payload.azure_tenant_id }}"}'
 
       - name: 'Build Packer Image'
-        env:
-          # Common variables
-          PKR_VAR_build_id: ${{ github.run_id }}
-          PKR_VAR_platform: ${{ github.event.client_payload.platform }}
-          PKR_VAR_vm_size: ${{ github.event.client_payload.vm_size }}
-          # AWS-specific variables
-          PKR_VAR_region: ${{ github.event.client_payload.aws_region || 'us-east-1' }}
-          # Azure-specific variables
-          PKR_VAR_managed_image_rg: ${{ github.event.client_payload.azure_resource_group }}
-          PKR_VAR_build_resource_group_name: ${{ github.event.client_payload.azure_resource_group }}
-          # GCP-specific variables
-          PKR_VAR_gcp_project_id: ${{ secrets.GCP_PROJECT_ID }}
         run: |
           TEMPLATE_FILE="${{ github.event.client_payload.template_file }}"
           
@@ -77,4 +65,15 @@ jobs:
           fi
 
           packer init "$TEMPLATE_FILE"
-          packer build "$TEMPLATE_FILE"
+          
+          # Explicitly pass variables on the command line for maximum precedence.
+          # This avoids any ambiguity from environment variables.
+          packer build \
+            -var "build_id=${{ github.run_id }}" \
+            -var "platform=${{ github.event.client_payload.platform }}" \
+            -var "vm_size=${{ github.event.client_payload.vm_size }}" \
+            -var "region=${{ github.event.client_payload.aws_region || 'us-east-1' }}" \
+            -var "managed_image_rg=${{ github.event.client_payload.azure_resource_group }}" \
+            -var "build_resource_group_name=${{ github.event.client_payload.azure_resource_group }}" \
+            -var "gcp_project_id=${{ secrets.GCP_PROJECT_ID }}" \
+            "$TEMPLATE_FILE"
