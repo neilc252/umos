@@ -24,8 +24,7 @@ jobs:
         if: github.event.client_payload.platform == 'gcp'
         uses: 'google-github-actions/auth@v2'
         with:
-          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
-          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
+          credentials_json: ${{ secrets.GCP_CREDENTIALS }}
 
       - name: Configure AWS Credentials for IAM Role
         if: github.event.client_payload.platform == 'aws' && github.event.client_payload.aws_role_arn
@@ -58,7 +57,7 @@ jobs:
 
       - name: 'Build Packer Image'
         env:
-          PKR_VAR_gcp_project_id: ${{ github.event.client_payload.gcp_project_id }}
+          PKR_VAR_gcp_project_id: ${{ secrets.GCP_PROJECT_ID }}
         run: |
           export BUILD_ID="${{ github.run_id }}"
           export PLATFORM="${{ github.event.client_payload.platform }}"
