@@ -5,7 +5,7 @@ on:
     types: [delete-image]
 
 permissions:
-  id-token: write # Required to fetch the OIDC token for AWS authentication.
+  id-token: write # Required to fetch the OIDC token for cloud authentication.
   contents: read  # Required for actions/checkout.
 
 jobs:
@@ -64,19 +64,29 @@ jobs:
           SNAPSHOT_ID=$(aws ec2 describe-images --image-ids $AMI_ID --query 'Images[0].BlockDeviceMappings[0].Ebs.SnapshotId' --output text)
           if [ -n "$SNAPSHOT_ID" ] && [ "$SNAPSHOT_ID" != "None" ]; then
             echo "Deleting associated snapshot ID: $SNAPSHOT_ID"
+            # Wait for the AMI to be fully deregistered before deleting the snapshot
+            aws ec2 wait image-available --image-ids $AMI_ID --filters Name=state,Values=deregistered || echo "Wait failed, proceeding with snapshot deletion."
+            sleep 15 # Add a small delay for safety
             aws ec2 delete-snapshot --snapshot-id $SNAPSHOT_ID
           else
             echo "Could not find associated snapshot."
           fi
           echo "AMI deregistration and snapshot deletion process initiated."
 
-
       # --- Azure Deletion ---
-      - name: Azure Login
-        if: github.event.client_payload.platform == 'azure'
+      - name: Azure Login with OIDC
+        if: github.event.client_payload.platform == 'azure' && github.event.client_payload.azure_auth_type == 'oidc'
         uses: azure/login@v1
         with:
-          creds: '{"clientId":"${{ secrets.AZURE_CLIENT_ID }}","clientSecret":"${{ secrets.AZURE_CLIENT_SECRET }}","subscriptionId":"${{ secrets.AZURE_SUBSCRIPTION_ID }}","tenantId":"${{ secrets.AZURE_TENANT_ID }}"}'
+          client-id: ${{ github.event.client_payload.azure_client_id }}
+          tenant-id: ${{ github.event.client_payload.azure_tenant_id }}
+          subscription-id: ${{ github.event.client_payload.azure_subscription_id }}
+
+      - name: Azure Login with Client Secret
+        if: github.event.client_payload.platform == 'azure' && github.event.client_payload.azure_auth_type != 'oidc'
+        uses: azure/login@v1
+        with:
+          creds: '{"clientId":"${{ github.event.client_payload.azure_client_id }}","clientSecret":"${{ secrets.AZURE_CLIENT_SECRET }}","subscriptionId":"${{ github.event.client_payload.azure_subscription_id }}","tenantId":"${{ github.event.client_payload.azure_tenant_id }}"}'
 
       - name: Delete Azure Image
         if: github.event.client_payload.platform == 'azure'
