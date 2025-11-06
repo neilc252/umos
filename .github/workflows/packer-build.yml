@@ -82,7 +82,7 @@ jobs:
             PACKER_ARGS="$PACKER_ARGS -var=build_resource_group_name=${{ github.event.client_payload.azure_resource_group }}"
           elif [ "$PLATFORM" == "aws" ]; then
             # Always pass a region. Use the one from the payload, or default to 'us-east-1' if it's empty.
-            AWS_REGION="${{ github.event.client_payload.aws_region:-'us-east-1' }}"
+            AWS_REGION="${{ github.event.client_payload.aws_region || 'us-east-1' }}"
             PACKER_ARGS="$PACKER_ARGS -var=region=$AWS_REGION"
           fi
 
