@@ -81,8 +81,10 @@ jobs:
             PACKER_ARGS="$PACKER_ARGS -var=managed_image_rg=${{ github.event.client_payload.azure_resource_group }}"
             PACKER_ARGS="$PACKER_ARGS -var=build_resource_group_name=${{ github.event.client_payload.azure_resource_group }}"
           elif [ "$PLATFORM" == "aws" ]; then
-            # The region payload defaults to us-east-1 if not set
-            PACKER_ARGS="$PACKER_ARGS -var=region=${{ github.event.client_payload.aws_region }}"
+            # Conditionally add the region if it is provided in the payload, otherwise Packer will use the default.
+            if [ -n "${{ github.event.client_payload.aws_region }}" ]; then
+              PACKER_ARGS="$PACKER_ARGS -var=region=${{ github.event.client_payload.aws_region }}"
+            fi
           fi
 
           packer init "$TEMPLATE_FILE"
