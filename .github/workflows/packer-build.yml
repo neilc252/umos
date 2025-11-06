@@ -74,6 +74,7 @@ jobs:
             packer build \
               -var "build_id=$BUILD_ID" \
               -var "platform=$PLATFORM" \
+              -var "vm_size=${{ github.event.client_payload.vm_size }}" \
               -var "managed_image_rg=${{ github.event.client_payload.managed_image_rg }}" \
               -var "build_resource_group_name=${{ github.event.client_payload.build_resource_group_name }}" \
               "$TEMPLATE_FILE"
@@ -81,5 +82,6 @@ jobs:
             packer build \
               -var "build_id=$BUILD_ID" \
               -var "platform=$PLATFORM" \
+              -var "vm_size=${{ github.event.client_payload.vm_size }}" \
               "$TEMPLATE_FILE"
           fi
