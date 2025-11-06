@@ -57,36 +57,24 @@ jobs:
 
       - name: 'Build Packer Image'
         env:
+          # Common variables
+          PKR_VAR_build_id: ${{ github.run_id }}
+          PKR_VAR_platform: ${{ github.event.client_payload.platform }}
+          PKR_VAR_vm_size: ${{ github.event.client_payload.vm_size }}
+          # AWS-specific variables
+          PKR_VAR_region: ${{ github.event.client_payload.aws_region || 'us-east-1' }}
+          # Azure-specific variables
+          PKR_VAR_managed_image_rg: ${{ github.event.client_payload.azure_resource_group }}
+          PKR_VAR_build_resource_group_name: ${{ github.event.client_payload.azure_resource_group }}
+          # GCP-specific variables
           PKR_VAR_gcp_project_id: ${{ secrets.GCP_PROJECT_ID }}
         run: |
-          export BUILD_ID="${{ github.run_id }}"
-          export PLATFORM="${{ github.event.client_payload.platform }}"
-          export TEMPLATE_FILE="${{ github.event.client_payload.template_file }}"
+          TEMPLATE_FILE="${{ github.event.client_payload.template_file }}"
           
           if [ ! -f "$TEMPLATE_FILE" ]; then
-            echo "Error: Template file $TEMPLATE_FILE not found in the repository's root directory."
+            echo "Error: Template file $TEMPLATE_FILE not found."
             exit 1
           fi
 
-          # Build up packer arguments dynamically
-          PACKER_ARGS="-var=build_id=$BUILD_ID -var=platform=$PLATFORM"
-
-          # VM Size argument (conditionally)
-          if [ -n "${{ github.event.client_payload.vm_size }}" ]; then
-            PACKER_ARGS="$PACKER_ARGS -var=vm_size=${{ github.event.client_payload.vm_size }}"
-          fi
-
-          # Platform-specific arguments
-          if [ "$PLATFORM" == "azure" ]; then
-            PACKER_ARGS="$PACKER_ARGS -var=managed_image_rg=${{ github.event.client_payload.azure_resource_group }}"
-            PACKER_ARGS="$PACKER_ARGS -var=build_resource_group_name=${{ github.event.client_payload.azure_resource_group }}"
-          elif [ "$PLATFORM" == "aws" ]; then
-            # Always pass a region. Use the one from the payload, or default to 'us-east-1' if it's empty.
-            AWS_REGION="${{ github.event.client_payload.aws_region || 'us-east-1' }}"
-            PACKER_ARGS="$PACKER_ARGS -var=region=$AWS_REGION"
-          fi
-
           packer init "$TEMPLATE_FILE"
-          
-          # Use eval to handle the string of arguments correctly
-          eval packer build $PACKER_ARGS "$TEMPLATE_FILE"
+          packer build "$TEMPLATE_FILE"
