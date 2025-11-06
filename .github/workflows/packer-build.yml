@@ -56,24 +56,32 @@ jobs:
           creds: '{"clientId":"${{ github.event.client_payload.azure_client_id }}","clientSecret":"${{ secrets.AZURE_CLIENT_SECRET }}","subscriptionId":"${{ github.event.client_payload.azure_subscription_id }}","tenantId":"${{ github.event.client_payload.azure_tenant_id }}"}'
 
       - name: 'Build Packer Image'
+        env:
+          PKR_VAR_gcp_project_id: ${{ secrets.GCP_PROJECT_ID }}
         run: |
-          TEMPLATE_FILE="${{ github.event.client_payload.template_file }}"
+          export BUILD_ID="${{ github.run_id }}"
+          export PLATFORM="${{ github.event.client_payload.platform }}"
+          export TEMPLATE_FILE="${{ github.event.client_payload.template_file }}"
           
           if [ ! -f "$TEMPLATE_FILE" ]; then
-            echo "Error: Template file $TEMPLATE_FILE not found."
+            echo "Error: Template file $TEMPLATE_FILE not found in the repository's root directory."
             exit 1
           fi
 
           packer init "$TEMPLATE_FILE"
           
-          # Explicitly pass variables on the command line for maximum precedence.
-          # This avoids any ambiguity from environment variables.
-          packer build \
-            -var "build_id=${{ github.run_id }}" \
-            -var "platform=${{ github.event.client_payload.platform }}" \
-            -var "vm_size=${{ github.event.client_payload.vm_size }}" \
-            -var "region=${{ github.event.client_payload.aws_region || 'us-east-1' }}" \
-            -var "managed_image_rg=${{ github.event.client_payload.azure_resource_group }}" \
-            -var "build_resource_group_name=${{ github.event.client_payload.azure_resource_group }}" \
-            -var "gcp_project_id=${{ secrets.GCP_PROJECT_ID }}" \
-            "$TEMPLATE_FILE"
+          if [ "$PLATFORM" == "azure" ]; then
+            packer build \
+              -var "build_id=$BUILD_ID" \
+              -var "platform=$PLATFORM" \
+              -var "vm_size=${{ github.event.client_payload.vm_size }}" \
+              -var "managed_image_rg=${{ github.event.client_payload.azure_resource_group }}" \
+              -var "build_resource_group_name=${{ github.event.client_payload.azure_resource_group }}" \
+              "$TEMPLATE_FILE"
+          else
+            packer build \
+              -var "build_id=$BUILD_ID" \
+              -var "platform=$PLATFORM" \
+              -var "vm_size=${{ github.event.client_payload.vm_size }}" \
+              "$TEMPLATE_FILE"
+          fi
